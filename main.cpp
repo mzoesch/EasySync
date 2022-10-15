@@ -86,13 +86,18 @@ int main() {
 
     int countDirsSource = 0;
     int countFilesSource = 0;
-    int bytesSource = 0;
+    unsigned long long int bytesSource = 0; // Max 18,446,744,073,709,551,615
     int countFilesToCopy = 0;
-    int bytesToCopy = 0;
+    unsigned long long int bytesToCopy = 0; // Max 18,446,744,073,709,551,615
     int filesNotCopied = 0;
+    int filesTimestampIncorrect = 0;
     
     vector<fs::path> filesToCopySourcePath; // This attracts bugs; fix
     vector<fs::path> filesToCopyTargetPath;
+
+    vector<fs::path> filesThatCouldNotBeCopied;
+    vector<fs::path> filesWhereTimestampIsIncorrect;
+
     string inputSource;
     string inputTarget;
 
@@ -128,6 +133,9 @@ int main() {
     fs::path absoluteSourcePath = inputSource;
     fs::path absoluteTargetPath = inputTarget;
     
+    cout << "Checking stats . . ." << endl;
+    cout << "This could take a while." << endl;
+
     // Get files to copy
     for (const auto & entry : fs::recursive_directory_iterator(absoluteSourcePath)) {
         
@@ -143,7 +151,7 @@ int main() {
         // File stats
         struct stat sourceFileInfo;
         if (stat(absolutePathSourceFile, &sourceFileInfo) != 0) { // Exception handling
-            cout << "Error on path: " << entry.path() << endl;
+            cout << "Error in source path: " << entry.path() << endl;
             cout << "Error: " << strerror(errno) << endl;
             continue;
         }
@@ -192,6 +200,7 @@ int main() {
     if (filesToCopySourcePath.size() != filesToCopyTargetPath.size()) {
         cout << "Fatal error: Vectors have different sizes. ";
         cout << filesToCopySourcePath.size() << " != " << filesToCopyTargetPath.size() << endl;
+
         system ("PAUSE");
         return 1;
     }
@@ -207,16 +216,16 @@ int main() {
 
     cout << endl;
     cout << "Overall stats: " << endl << endl;
-    cout << "Source -> Dirs:                    : " << countDirsSource << endl;
-    cout << "Source -> Files:                   : " << countFilesSource << endl;
-    cout << "Source -> Overall size (b):        : " << bytesSource << endl;
-    cout << "Source -> Overall size (mb bi):    : " << bytesSource * 0.00000095367432 << endl;
-    cout << "Source -> Overall size (mb dc):    : " << bytesSource * 0.000001 << endl;
+    cout << "Source -> Dirs:                    :  " << countDirsSource << endl;
+    cout << "Source -> Files:                   :  " << countFilesSource << endl;
+    cout << "Source -> Overall size (b):        :  " << bytesSource << endl;
+    cout << "Source -> Overall size (mb bi):    : ~" << bytesSource * 0.00000095367432 << endl;
+    cout << "Source -> Overall size (mb dc):    : ~" << bytesSource * 0.000001 << endl;
     cout << endl;
-    cout << "ToCopy -> Files:                   : " << countFilesToCopy << endl;
-    cout << "ToCopy -> Overall size (b):        : " << bytesToCopy << endl;
-    cout << "ToCopy -> Overall size (mb bi):    : " << bytesToCopy * 0.00000095367432 << endl;
-    cout << "ToCopy -> Overall size (mb dc):    : " << bytesToCopy * 0.000001 << endl;
+    cout << "ToCopy -> Files:                   :  " << countFilesToCopy << endl;
+    cout << "ToCopy -> Overall size (b):        :  " << bytesToCopy << endl;
+    cout << "ToCopy -> Overall size (mb bi):    : ~" << bytesToCopy * 0.00000095367432 << endl;
+    cout << "ToCopy -> Overall size (mb dc):    : ~" << bytesToCopy * 0.000001 << endl;
     
     // No files to copy -> abort
     if (countFilesToCopy == 0) {
@@ -259,21 +268,62 @@ int main() {
             fs::copy_file(absoluteSourcePathFile, absoluteTargetPathFile, copyOptions);
         } catch (exception& e) { // Not using fs::filesystem_error since std::bad_alloc can throw too
             filesNotCopied++;
-            cout << "Error in path: " << absoluteSourcePathFile << endl;
-            cout << e.what() << endl;
+            filesThatCouldNotBeCopied.push_back(absoluteSourcePathFile);
+            cout << endl << "Error in path: " << absoluteSourcePathFile << endl;
+            cout << e.what() << endl << endl;
             continue;
         }
 
-        // Correct timestamp
-        fs::file_time_type fLastWriteTime = fs::last_write_time(absoluteSourcePathFile);
-        fs::last_write_time(absoluteTargetPathFile, fLastWriteTime);
 
+        // Correct timestamp
+        try {
+            fs::file_time_type fLastWriteTime = fs::last_write_time(absoluteSourcePathFile);
+            fs::last_write_time(absoluteTargetPathFile, fLastWriteTime);
+        } catch (exception& e) {
+            filesTimestampIncorrect++;
+            filesWhereTimestampIsIncorrect.push_back(absoluteTargetPathFile);
+            cout << endl << "Error in path: " << absoluteTargetPathFile << endl;
+            cout << "Error while editing the timestamp." << endl;
+            cout << e.what() << endl << endl;
+            continue;
+        }
+        
         cout << "Successfully copied file: " << absoluteSourcePathFile << endl;
     }
 
+
     cout << endl;
-    if (filesNotCopied != 0) cout << "Number of files that could not be copied: " << filesNotCopied << endl << endl;
-    
+
+    if (filesNotCopied != 0) {
+        string answ;
+        cout << "Number of files that could not be copied: " << filesNotCopied << endl;
+        cout << "Show files (y/n): ";
+        cin >> answ;
+        if (answ == "y") { // Display failed paths
+            cout << endl;
+            for (int i = 0; i < filesThatCouldNotBeCopied.size(); i++) {
+                try { cout << filesThatCouldNotBeCopied[i] << endl; }
+                catch (exception& e) { cout << "Could not display path: " << e.what() << endl; }
+            }
+        }
+    }
+
+    if (filesTimestampIncorrect != 0) {
+        string answ;
+        cout << "Number of files where the timestamp could not be corrected: " << filesTimestampIncorrect << endl;
+        cout << "Show files (y/n): ";
+        cin >> answ;
+        if (answ == "y") { // Display failed paths
+            cout << endl;
+            for (int i = 0; i < filesWhereTimestampIsIncorrect.size(); i++) {
+                try { cout << filesWhereTimestampIsIncorrect[i] << endl; }
+                catch (exception& e) { cout << "Could not display path: " << e.what() << endl; }
+            }
+        }
+    }
+
+    cout << endl;
+
     system("PAUSE");
     return 0;
 }
