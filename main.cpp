@@ -129,7 +129,7 @@ int main() {
     } else if (writeMostRecentPathTarget(inputTarget) != 0) cout << "Error: Writing most recent target path." << endl;
 
     cout << endl << "Using source path:     : " << inputSource << endl;
-    cout << "Using target path:     : " << inputTarget << endl << endl;;
+    cout << "Using target path:     : " << inputTarget << endl << endl;
 
     fs::path absoluteSourcePath = inputSource;
     fs::path absoluteTargetPath = inputTarget;
