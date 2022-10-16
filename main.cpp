@@ -8,6 +8,7 @@
 #include<cstring>
 #include<filesystem>
 #include<vector>
+#include<chrono>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -78,7 +79,7 @@ string enterAnAbsolutePath() {
 
     string absolutePath;
     cout << "Enter absolute path: ";
-    cin >> absolutePath;
+    getline(cin, absolutePath); // Get line will get console with spaces!!!
     return absolutePath;
 }
 
@@ -107,7 +108,7 @@ int main() {
 
     // Source
     cout << endl << "Enter absolute source path ('r' for most recent path): ";
-    cin >> inputSource;
+    getline(cin, inputSource); // Get line will get console with spaces!!!
     if (inputSource == "r") {
         inputSource = getMostRecentPathSource();
         if (inputSource == "e") {
@@ -118,7 +119,7 @@ int main() {
 
     // Target
     cout << "Enter absolute target path ('r' for most recent path): ";
-    cin >> inputTarget;
+    getline(cin, inputTarget); // Get line will get console with spaces!!!
     if (inputTarget == "r") {
         inputTarget = getMostRecentPathTarget();
         if (inputTarget == "e") {
@@ -249,6 +250,8 @@ int main() {
 
     // Copy files
     cout << endl << "Copying files." << endl;
+    auto tStart = chrono::high_resolution_clock::now();
+
     for (int i = 0; i < filesToCopySourcePath.size(); i++) {
         fs::path absoluteSourcePathFile = filesToCopySourcePath[i];
         fs::path absoluteTargetPathFile = filesToCopyTargetPath[i];
@@ -291,8 +294,16 @@ int main() {
         cout << "Successfully copied file: " << absoluteSourcePathFile << endl;
     }
 
-
     cout << endl;
+
+    // Time
+    auto tEnd = chrono::high_resolution_clock::now();
+    double timeElapsed = chrono::duration<double, milli>(tEnd - tStart).count();
+    if (timeElapsed > 60000) cout << "Program finished in " << timeElapsed / 1000 / 60 << " min." << endl;
+    else if (timeElapsed > 1000) cout << "Program finished in " << timeElapsed / 1000 << " s." << endl;
+    else cout << "Program finished in " << timeElapsed << " ms." << endl;
+    cout << endl;
+    
 
     if (filesNotCopied != 0) {
         string answ;
